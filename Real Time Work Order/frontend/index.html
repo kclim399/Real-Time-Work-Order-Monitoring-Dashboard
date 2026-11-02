@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Work Order Monitoring Dashboard</title>
+    <!-- External Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Link to external CSS (Cache Buster applied) -->
+    <link rel="stylesheet" href="css/style.css?v=2.0">
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans h-screen flex overflow-hidden">
+
+    <div id="toast-msg" class="fixed top-5 right-5 bg-red-500 text-white px-6 py-3 rounded-lg shadow-xl transform transition-all duration-300 translate-x-full opacity-0 z-50 flex items-center gap-3 font-bold border border-red-600">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span id="toast-text">Please select a Work Order first!</span>
+    </div>
+
+    <!-- AI REPORT MODAL -->
+    <div id="report-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden flex-col items-center justify-center p-4 lg:p-10">
+        <div class="bg-white w-full max-w-5xl h-full max-h-full rounded-2xl shadow-2xl flex flex-col overflow-hidden transform transition-all">
+            <!-- Modal Header -->
+            <div class="bg-slate-800 text-white px-6 py-4 flex justify-between items-center shrink-0">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-file-signature text-2xl text-blue-400"></i>
+                    <div>
+                        <h2 class="text-lg font-bold leading-tight">AI Generated Intelligence Report</h2>
+                        <p class="text-xs text-slate-400">Analysis completed autonomously via database</p>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="downloadReport('pdf', 'report-content')" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded shadow transition text-sm font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-file-pdf"></i> PDF
+                    </button>
+                    <button onclick="downloadReport('word', 'report-content')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow transition text-sm font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-file-word"></i> Word
+                    </button>
+                    <button onclick="document.getElementById('report-modal').classList.add('hidden'); document.getElementById('report-modal').classList.remove('flex')" class="bg-slate-700 hover:bg-slate-600 text-white w-10 h-10 rounded shadow transition flex items-center justify-center ml-2">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+            <!-- Modal Body -->
+            <div class="flex-1 overflow-y-auto bg-slate-100 p-8 custom-scrollbar">
+                <div id="report-content" class="bg-white w-full max-w-4xl mx-auto shadow-md p-10 min-h-full">
+                    <!-- AI Content Injected Here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col shadow-lg z-20 shrink-0">
+        <div class="p-6 border-b border-slate-100">
+            <h1 class="text-xl leading-tight font-normal text-slate-800 flex items-start gap-2">
+                <i class="fa-solid fa-industry text-blue-600 mt-1"></i> Work Order Monitoring Dashboard
+            </h1>
+        </div>
+        
+        <nav class="flex-1 py-6 space-y-1">
+            <button onclick="App.navTo('page-wo')" id="nav-wo" class="nav-item active w-full text-left px-6 py-3 font-bold text-slate-500 hover:bg-slate-50 transition-colors flex items-center gap-3">
+                <i class="fa-solid fa-list-check"></i> Work Orders
+            </button>
+        </nav>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto p-8 relative">
+        
+        <!-- PAGE 1: WORK ORDERS -->
+        <div id="page-wo" class="page-section active max-w-5xl mx-auto">
+            <header class="flex justify-between items-end mb-6">
+                <div>
+                    <h2 class="text-3xl font-black text-slate-800">Work Order List</h2>
+                    <p class="text-lg font-medium text-slate-500 mt-1">Choose a work order below to track production progress and live yield.</p>
+                </div>
+            </header>
+
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex gap-4 items-center">
+                <input type="text" id="wo-search" placeholder="Search WO Number..." class="flex-1 px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                <select id="wo-sort" class="px-4 py-3 rounded-lg border border-slate-200 bg-white text-sm font-bold focus:outline-none">
+                    <option value="newest">Sort: Newest First</option>
+                    <option value="oldest">Sort: Oldest First</option>
+                </select>
+            </div>
+            
+            <div id="wo-list-container" class="flex flex-col gap-3"></div>
+        </div>
+
+        <!-- PAGE 2: REAL-TIME MONITOR -->
+        <div id="page-monitor" class="page-section">
+            <div class="tab-container">
+                <button onclick="App.navTo('page-wo')" class="home-btn" title="Back to Work Orders"><i class="fa-solid fa-house"></i></button>
+                <button onclick="App.navTo('page-monitor')" class="chrome-tab active"><i class="fa-solid fa-chart-line mr-2"></i> Real-Time Monitor</button>
+                <button onclick="App.navTo('page-analytics')" class="chrome-tab"><i class="fa-solid fa-chart-pie mr-2"></i> Analytics & Stats</button>
+            </div>
+            <div class="flex items-center gap-4 mb-8">
+                <h2 class="text-2xl font-black text-slate-800 flex items-center gap-2">WO: <span id="monitor-wo-id" class="text-blue-600">--</span></h2>
+                <div class="ml-auto text-right"><span id="live-indicator" class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold animate-pulse">● LIVE POLLING</span></div>
+            </div>
+
+            <div id="monitor-top-section">
+                <!-- Total Progress -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-6">
+                    <div class="flex justify-between text-sm font-bold mb-2">
+                        <span class="text-slate-500">Work Order Progress</span>
+                        <span class="text-blue-600"><span id="prog-current">0</span> / <span id="prog-target">0</span> Units</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-4 overflow-hidden">
+                        <div id="prog-bar" class="bg-blue-600 h-4 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- KPI Cards -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-white p-6 rounded-2xl border-l-4 border-blue-500 shadow-sm flex flex-col justify-center">
+                        <p class="text-[10px] text-slate-400 font-bold uppercase mb-2">Total Output</p>
+                        <h3 id="monitor-output" class="text-4xl lg:text-5xl font-black text-slate-800">0</h3>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl border-l-4 border-emerald-500 shadow-sm flex flex-col justify-center">
+                        <p class="text-[10px] text-slate-400 font-bold uppercase mb-2">Pass</p>
+                        <h3 id="pass-count" class="text-4xl lg:text-5xl font-black text-emerald-600">0</h3>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl border-l-4 border-red-500 shadow-sm flex flex-col justify-center">
+                        <p class="text-[10px] text-slate-400 font-bold uppercase mb-2">Rejected</p>
+                        <h3 id="fail-count" class="text-4xl lg:text-5xl font-black text-red-600">0</h3>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    <div id="monitor-yield-card" class="lg:col-span-2 bg-white p-6 rounded-2xl border-l-4 border-green-500 shadow-sm flex flex-col justify-center transition-all duration-300">
+                        <p class="text-[10px] text-slate-400 font-bold uppercase mb-2">Live Yield</p>
+                        <h3 id="monitor-yield" class="text-4xl lg:text-5xl font-black text-green-600">0%</h3>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl border-l-4 border-orange-500 shadow-sm flex flex-col justify-center">
+                        <p class="text-[10px] text-slate-400 font-bold uppercase mb-2">Top Defect</p>
+                        <h3 id="top-defect" class="text-sm font-black text-orange-600 leading-tight">NONE</h3>
+                    </div>
+                </div>
+
+                <!-- 6 Station Throughput Progress Bars -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col">
+                    <h4 class="text-sm font-black text-slate-500 uppercase tracking-wide mb-4"><i class="fa-solid fa-bars-progress mr-2"></i> Real-Time Station Throughput</h4>
+                    <div class="grid grid-cols-1 gap-4">
+                        
+                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-center">
+                            <div class="flex justify-between text-xs font-bold mb-2 text-slate-500 uppercase">
+                                <span>1. Entry</span>
+                                <span class="text-blue-600"><span id="st-qty-1">0</span> / <span class="st-target">0</span> Units</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-2 mb-2">
+                                <div class="bg-blue-500 h-2 rounded-full transition-all duration-500" id="st-bar-1" style="width: 0%"></div>
+                            </div>
+                            <div class="flex justify-between text-[10px] font-bold">
+                                <span class="text-emerald-600">PASS : <span id="st-pass-1">0</span> units</span>
+                                <span class="text-red-500">REJECTED : <span id="st-fail-1">0</span> units</span>
+                            </div>
+                        </div>
+
+                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-center">
+                            <div class="flex justify-between text-xs font-bold mb-2 text-slate-500 uppercase">
+                                <span>2. Insp/Assy</span>
+                                <span class="text-blue-600"><span id="st-qty-2">0</span> / <span class="st-target">0</span> Units</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-2 mb-2">
+                                <div class="bg-blue-500 h-2 rounded-full transition-all duration-500" id="st-bar-2" style="width: 0%"></div>
+                            </div>
+                            <div class="flex justify-between text-[10px] font-bold">
+                                <span class="text-emerald-600">PASS : <span id="st-pass-2">0</span> units</span>
+                                <span class="text-red-500">REJECTED : <span id="st-fail-2">0</span> units</span>
+                            </div>
+                        </div>
+
+                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-center">
+                            <div class="flex justify-between text-xs font-bold mb-2 text-slate-500 uppercase">
+                                <span>3. IPQC</span>
+                                <span class="text-blue-600"><span id="st-qty-3">0</span> / <span class="st-target">0</span> Units</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-2 mb-2">
+                                <div class="bg-blue-500 h-2 rounded-full transition-all duration-500" id="st-bar-3" style="width: 0%"></div>
+                            </div>
+                            <div class="flex justify-between text-[10px] font-bold">
+                                <span class="text-emerald-600">PASS : <span id="st-pass-3">0</span> units</span>
+                                <span class="text-red-500">REJECTED : <span id="st-fail-3">0</span> units</span>
+                            </div>
+                        </div>
+
+                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-center">
+                            <div class="flex justify-between text-xs font-bold mb-2 text-slate-500 uppercase">
+                                <span>4. Semi Swage</span>
+                                <span class="text-blue-600"><span id="st-qty-4">0</span> / <span class="st-target">0</span> Units</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-2 mb-2">
+                                <div class="bg-blue-500 h-2 rounded-full transition-all duration-500" id="st-bar-4" style="width: 0%"></div>
+                            </div>
+                            <div class="flex justify-between text-[10px] font-bold">
+                                <span class="text-emerald-600">PASS : <span id="st-pass-4">0</span> units</span>
+                                <span class="text-red-500">REJECTED : <span id="st-fail-4">0</span> units</span>
+                            </div>
+                        </div>
+
+                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-center">
+                            <div class="flex justify-between text-xs font-bold mb-2 text-slate-500 uppercase">
+                                <span>5. VMI Swage</span>
+                                <span class="text-blue-600"><span id="st-qty-5">0</span> / <span class="st-target">0</span> Units</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-2 mb-2">
+                                <div class="bg-blue-500 h-2 rounded-full transition-all duration-500" id="st-bar-5" style="width: 0%"></div>
+                            </div>
+                            <div class="flex justify-between text-[10px] font-bold">
+                                <span class="text-emerald-600">PASS : <span id="st-pass-5">0</span> units</span>
+                                <span class="text-red-500">REJECTED : <span id="st-fail-5">0</span> units</span>
+                            </div>
+                        </div>
+
+                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-center">
+                            <div class="flex justify-between text-xs font-bold mb-2 text-slate-500 uppercase">
+                                <span>6. Dust Plug</span>
+                                <span class="text-blue-600"><span id="st-qty-6">0</span> / <span class="st-target">0</span> Units</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-2 mb-2">
+                                <div class="bg-blue-500 h-2 rounded-full transition-all duration-500" id="st-bar-6" style="width: 0%"></div>
+                            </div>
+                            <div class="flex justify-between text-[10px] font-bold">
+                                <span class="text-emerald-600">PASS : <span id="st-pass-6">0</span> units</span>
+                                <span class="text-red-500">REJECTED : <span id="st-fail-6">0</span> units</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE 3: ANALYTICS -->
+        <div id="page-analytics" class="page-section">
+            
+            <div class="tab-container">
+                <button onclick="App.navTo('page-wo')" class="home-btn" title="Back to Work Orders"><i class="fa-solid fa-house"></i></button>
+                <button onclick="App.navTo('page-monitor')" class="chrome-tab"><i class="fa-solid fa-chart-line mr-2"></i> Real-Time Monitor</button>
+                <button onclick="App.navTo('page-analytics')" class="chrome-tab active"><i class="fa-solid fa-chart-pie mr-2"></i> Analytics & Stats</button>
+            </div>
+
+            <div class="flex items-center gap-4 mb-4">
+                <h2 class="text-2xl font-black text-slate-800 flex items-center gap-2">WO: <span id="analytics-wo-id" class="text-purple-600">--</span></h2>
+            </div>
+
+            <header class="mb-6">
+                <h2 class="text-3xl font-black text-slate-800">Historical & Statistical Analytics</h2>
+                <p class="text-slate-500 mt-1">Diagnostic views mapping Terminal Outputs (Traceability Mode).</p>
+            </header>
+
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-col gap-4">
+                <div class="flex flex-wrap items-center gap-6">
+                    <div class="flex gap-5">
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input type="radio" name="filter-mode" value="today" onchange="Analytics.onFilterModeChange()" checked class="w-4 h-4 text-blue-600 cursor-pointer">
+                            <span class="text-sm font-bold text-slate-600">Today</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input type="radio" name="filter-mode" value="daily" onchange="Analytics.onFilterModeChange()" class="w-4 h-4 text-blue-600 cursor-pointer">
+                            <span class="text-sm font-bold text-slate-600">Custom Range</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input type="radio" name="filter-mode" value="monthly" onchange="Analytics.onFilterModeChange()" class="w-4 h-4 text-blue-600 cursor-pointer">
+                            <span class="text-sm font-bold text-slate-600">All Months</span>
+                        </label>
+                    </div>
+
+                    <div id="custom-date-filters" class="hidden flex flex-wrap items-end gap-3 border-l-2 border-slate-100 pl-6">
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">Start Date</label>
+                            <input type="date" id="chart-filter-start" onchange="Analytics.checkShiftVisibility()" class="block w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm font-bold outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">End Date</label>
+                            <input type="date" id="chart-filter-end" onchange="Analytics.checkShiftVisibility()" class="block w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm font-bold outline-none">
+                        </div>
+                        <button onclick="Analytics.checkShiftVisibility(); Analytics.renderDynamicCharts()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-1.5 rounded text-sm font-bold transition shadow-sm mb-[1px]">Apply</button>
+                    </div>
+                    
+                    <span id="chart-error" class="text-xs font-bold text-red-500 ml-auto hidden"><i class="fa-solid fa-triangle-exclamation"></i> No data found in this range.</span>
+                </div>
+
+                <!-- SHIFT FILTERS ROW -->
+                <div id="shift-filters" class="flex flex-wrap items-center gap-5 border-t border-slate-100 pt-3">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shift View:</span>
+                    <label class="flex items-center gap-2 cursor-pointer group">
+                        <input type="radio" name="shift-mode" value="all" onchange="Analytics.renderDynamicCharts()" checked class="w-4 h-4 text-purple-600 cursor-pointer">
+                        <span class="text-sm font-bold text-slate-600">All (6am - 5am)</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer group">
+                        <input type="radio" name="shift-mode" value="day" onchange="Analytics.renderDynamicCharts()" class="w-4 h-4 text-purple-600 cursor-pointer">
+                        <span class="text-sm font-bold text-slate-600">Day Shift (6am - 5pm)</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer group">
+                        <input type="radio" name="shift-mode" value="night" onchange="Analytics.renderDynamicCharts()" class="w-4 h-4 text-purple-600 cursor-pointer">
+                        <span class="text-sm font-bold text-slate-600">Night Shift (6pm - 5am)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-6 pb-10">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-[380px] flex flex-col">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-xs font-black text-slate-400 uppercase tracking-tight">1. Final Output Trend (Completed & Scrapped)</h3>
+                        <select id="output-chart-type" onchange="Analytics.renderDynamicCharts()" class="bg-slate-50 border border-slate-200 text-[10px] font-bold text-slate-500 rounded px-2 py-1 outline-none cursor-pointer hover:bg-slate-100">
+                            <option value="bar">Bar Chart</option>
+                            <option value="line">Line Chart</option>
+                        </select>
+                    </div>
+                    <div class="flex-1 w-full overflow-x-auto pb-4 custom-scrollbar">
+                        <div class="relative h-full" style="width: 1400px;">
+                            <canvas id="chart-output"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-[380px] flex flex-col">
+                    <h3 class="text-xs font-black text-slate-400 uppercase mb-2 tracking-tight">2. Terminal Yield Degradation Trend</h3>
+                    <div class="flex-1 w-full overflow-x-auto pb-4 custom-scrollbar">
+                        <div class="relative h-full" style="width: 1400px;">
+                            <canvas id="chart-yield"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-[380px] flex flex-col">
+                    <h3 class="text-xs font-black text-slate-400 uppercase mb-2 tracking-tight">3. Scrapped Frequencies by Station</h3>
+                    <div class="flex-1 w-full relative"><canvas id="chart-station"></canvas></div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-[380px] flex flex-col">
+                    <h3 class="text-xs font-black text-slate-400 uppercase mb-2 tracking-tight">4. Defect Responsibility by Operator (Fails Only)</h3>
+                    <div class="flex-1 w-full relative"><canvas id="chart-operator"></canvas></div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-[380px] flex flex-col">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-xs font-black text-slate-400 uppercase tracking-tight">5. Defect Distribution</h3>
+                        <!-- UNIQUE ID AND FUNCTION FOR ANALYTICS TAB -->
+                        <select id="analytics-defect-chart-type" onchange="Analytics.renderDefectChart()" class="bg-slate-50 border border-slate-200 text-[10px] font-bold text-slate-500 rounded px-2 py-1 outline-none cursor-pointer hover:bg-slate-100">
+                            <option value="doughnut">Doughnut</option>
+                            <option value="pie">Pie</option>
+                            <option value="bar">Bar</option>
+                            <option value="pareto">Pareto</option>
+                        </select>
+                    </div>
+                    <!-- UNIQUE CANVAS ID -->
+                    <div class="flex-1 w-full relative"><canvas id="analyticsDefectChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ========================================== -->
+    <!-- FLOATING AI CHATBOT UI                     -->
+    <!-- ========================================== -->
+    
+    <button onclick="toggleChat()" class="fixed bottom-6 left-6 w-16 h-16 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-2xl flex items-center justify-center transition-transform hover:scale-105 z-50 group">
+        <i class="fa-solid fa-robot text-2xl group-hover:animate-bounce"></i>
+    </button>
+
+    <div id="chat-window" class="fixed bottom-28 left-6 w-96 max-w-[calc(100vw-3rem)] bg-white rounded-2xl shadow-2xl z-50 flex-col hidden overflow-hidden border border-slate-200 transition-all duration-300 ease-in-out" style="height: 600px; max-height: calc(100vh - 8rem);">
+        
+        <div id="chat-header" class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4 flex justify-between items-center shadow-md z-10 relative cursor-grab select-none">
+            <div class="flex items-center gap-3">
+                <div class="bg-white text-purple-600 w-8 h-8 rounded-full flex items-center justify-center shadow-inner">
+                    <i class="fa-solid fa-brain"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold leading-tight pointer-events-none text-yellow-400">Smart Assistant</h3>
+                    <p class="text-[10px] text-purple-200 opacity-90 uppercase tracking-widest pointer-events-none">Powered by Gemini</p>
+                </div>
+            </div>
+            <div>
+                <button onclick="toggleFullscreenChat()" class="text-white hover:text-purple-200 transition text-xl mr-3"><i class="fa-solid fa-expand" id="chat-fullscreen-icon"></i></button>
+                <button onclick="toggleChat()" class="text-white hover:text-purple-200 transition text-xl"><i class="fa-solid fa-circle-chevron-down"></i></button>
+            </div>
+        </div>
+        
+        <div id="chat-messages" class="flex-1 p-4 overflow-y-auto bg-slate-50 flex flex-col gap-4 custom-scrollbar">
+            <div class="flex items-start gap-2">
+                <div class="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center shrink-0 border border-purple-200">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <div class="bg-white border border-slate-200 p-3 rounded-2xl rounded-tl-none shadow-sm text-sm text-slate-700 max-w-[85%] font-medium">
+                    Hi! I am the NationGate Assistant chatbot. How can I help you analyze the factory data today?
+                </div>
+            </div>
+        </div>
+
+        <div class="p-3 bg-white border-t border-slate-100 flex gap-2 overflow-x-auto custom-scrollbar whitespace-nowrap">
+            <button onclick="triggerReportButton()" class="text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-full hover:bg-blue-100 transition whitespace-nowrap shadow-sm">
+                <i class="fa-solid fa-file-signature mr-1"></i> Generate AI Report
+            </button>
+            <button onclick="sendQuickChat('Give me a performance report (total output, pass, fail) for today across all stations.')" class="text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition whitespace-nowrap">
+                <i class="fa-solid fa-chart-simple mr-1"></i> Yield Report
+            </button>
+            <button onclick="sendQuickChat('What are the top 5 defects across all stations?')" class="text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-full hover:bg-orange-100 transition whitespace-nowrap">
+                <i class="fa-solid fa-triangle-exclamation mr-1"></i> Top Defects
+            </button>
+            <button onclick="exportLastTableToCSV()" class="text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full hover:bg-emerald-100 transition whitespace-nowrap">
+                <i class="fa-solid fa-file-excel mr-1"></i> Export Data
+            </button>
+        </div>
+
+        <div class="p-3 bg-white border-t border-slate-200 flex gap-2 items-center">
+            <input type="text" id="chat-input" placeholder="Type your question..." class="flex-1 bg-slate-100 px-4 py-3 rounded-full text-sm font-medium outline-none focus:ring-2 focus:ring-purple-400 transition border border-slate-200" onkeypress="if(event.key === 'Enter') handleSendChat()">
+            <button onclick="handleSendChat()" class="w-12 h-12 rounded-full bg-purple-600 text-white flex items-center justify-center hover:bg-purple-700 transition shrink-0 shadow-md">
+                <i class="fa-solid fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- External Script loaded at the VERY END to prevent "App is not defined" errors -->
+    <script src="js/app.js?v=2.0"></script>
+</body>
+</html>
