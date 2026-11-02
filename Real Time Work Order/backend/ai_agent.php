@@ -6,10 +6,12 @@ require_once 'config.php';
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
 
-// ==============================================================================
-// 1. INSERT YOUR GEMINI API KEY HERE
-// ==============================================================================
-$GEMINI_API_KEY = trim("AIzaSyCQ2Vvb52anl5vQYTuTBWabz2xZ7diMdlY"); 
+
+// Load API key securely from untracked config.secret.php or environment variable
+$secretConfigPath = __DIR__ . '/config.secret.php';
+$secretConfig = file_exists($secretConfigPath) ? require $secretConfigPath : [];
+$GEMINI_API_KEY = trim($secretConfig['GEMINI_API_KEY'] ?? getenv('GEMINI_API_KEY') ?: '');
+
 
 $input = json_decode(file_get_contents('php://input'), true);
 $user_question = $input['question'] ?? '';

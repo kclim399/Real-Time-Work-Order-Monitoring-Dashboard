@@ -1,0 +1,11 @@
+# Secret API Keys & Environment Configurations (NEVER COMMIT)
+config.secret.php
+**/config.secret.php
+.env
+*.env
+
+# Operating System & Editor Junk Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
